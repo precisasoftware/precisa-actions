@@ -65,6 +65,17 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Debug module layout
+        run: |
+          echo "=== go.mod replace section ==="
+          grep -A5 "^replace" go.mod || echo "(no replace block)"
+          echo "=== directory layout ==="
+          ls -la
+          echo "=== precisa-go go.mod ==="
+          cat precisa-go/go.mod | head -3 || echo "MISSING"
+          echo "=== precisa-proto/gen/go go.mod ==="
+          cat precisa-proto/gen/go/go.mod | head -3 || echo "MISSING"
+
       - name: Build (populate module cache for golangci-lint)
         run: go build ./...
 
