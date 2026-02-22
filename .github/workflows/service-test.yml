@@ -65,6 +65,9 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Build (populate module cache for golangci-lint)
+        run: go build ./...
+
       - name: Lint
         run: |
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
