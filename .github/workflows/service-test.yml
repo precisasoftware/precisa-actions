@@ -71,10 +71,11 @@ jobs:
           golangci-lint run ./...
 
       - name: Run migrations
-        if: hashFiles('migrations/**') != ''
         run: |
-          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-          migrate -path migrations -database "postgres://test:test@localhost:5432/test?sslmode=disable" up
+          if [ -d migrations ]; then
+            go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+            migrate -path migrations -database "postgres://test:test@localhost:5432/test?sslmode=disable" up
+          fi
 
       - name: Test
         run: go test -race -count=1 -coverprofile=coverage.out ./...
@@ -85,7 +86,7 @@ jobs:
           SERVICE_NAME: ${{ inputs.service_name }}
 
       - name: Upload coverage
-        uses: codecov/codecov-action
+        uses: codecov/codecov-action@v4
         with:
           file: coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
