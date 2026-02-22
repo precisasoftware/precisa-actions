@@ -66,7 +66,7 @@ jobs:
         run: go mod download
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action
         with:
           version: latest
 
@@ -84,7 +84,7 @@ jobs:
           SERVICE_NAME: ${{ inputs.service_name }}
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action
         with:
           file: coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
