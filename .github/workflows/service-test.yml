@@ -35,7 +35,17 @@ jobs:
         with:
           path: .
 
+      - name: Check for precisa replace directives
+        id: precisa
+        run: |
+          if grep -q "precisa-go" go.mod 2>/dev/null; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout precisa-go (shared library)
+        if: steps.precisa.outputs.enabled == 'true'
         uses: actions/checkout@v4
         with:
           repository: precisasoftware/precisa-go
@@ -43,6 +53,7 @@ jobs:
           token: ${{ secrets.GH_PAT || github.token }}
 
       - name: Checkout precisa-proto (schemas)
+        if: steps.precisa.outputs.enabled == 'true'
         uses: actions/checkout@v4
         with:
           repository: precisasoftware/precisa-proto
@@ -50,6 +61,7 @@ jobs:
           token: ${{ secrets.GH_PAT || github.token }}
 
       - name: Patch go.mod replace directives for CI workspace
+        if: steps.precisa.outputs.enabled == 'true'
         # Rewrites local replace paths from sibling-dir style (../precisa-go)
         # to subdirectory style (./precisa-go) to match the CI checkout layout.
         # Dots are escaped (\.\.) so sed treats them as literals, not wildcards.
