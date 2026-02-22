@@ -1,0 +1,90 @@
+name: Service Test (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+        description: "The name of the service repository (e.g. svc-auth)"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GOPRIVATE: github.com/precisasoftware/*
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout service repository
+        uses: actions/checkout@v4
+        with:
+          path: .
+
+      - name: Checkout precisa-go (shared library)
+        uses: actions/checkout@v4
+        with:
+          repository: precisasoftware/precisa-go
+          path: ./precisa-go
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Checkout precisa-proto (schemas)
+        uses: actions/checkout@v4
+        with:
+          repository: precisasoftware/precisa-proto
+          path: ./precisa-proto
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Path 'go.mod' replace directives for CI workspace
+        # Modifies:
+        # replace github.com/precisasoftware/precisa-go => ../precisa-go  ->  ./precisa-go
+        # replace github.com/precisasoftware/precisa-proto/gen/go => ../precisa-proto/gen/go  ->  ./precisa-proto/gen/go
+        run: |
+          sed -i 's|../precisa-go|./precisa-go|g' go.mod
+          sed -i 's|../precisa-proto/gen/go|./precisa-proto/gen/go|g' go.mod
+        
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      - name: Run migrations
+        run: |
+          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+          migrate -path migrations -database "postgres://test:test@localhost:5432/test?sslmode=disable" up
+
+      - name: Test
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
+        env:
+          DATABASE_URL: postgres://test:test@localhost:5432/test?sslmode=disable
+          AUTH_JWT_SECRET: test-secret-do-not-use-in-production
+          JWT_SECRET: test-secret-do-not-use-in-production
+          SERVICE_NAME: ${{ inputs.service_name }}
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.out
+          token: ${{ secrets.CODECOV_TOKEN }}

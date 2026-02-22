@@ -1,0 +1,46 @@
+# Dockerfile.svc — Builds any service from the workspace root.
+# Used by docker-compose.yml with build arg SVC_DIR (e.g. svc-auth).
+# This is needed because each service's go.mod has replace directives
+# pointing to ../precisa-go and ../precisa-proto/gen/go.
+
+ARG SVC_DIR
+
+# ---- Build Stage ----
+FROM golang:1.26-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /workspace
+
+# Copy shared dependencies first (for caching).
+COPY precisa-go/ precisa-go/
+COPY precisa-proto/gen/go/ precisa-proto/gen/go/
+
+# Copy the service module files and download deps.
+ARG SVC_DIR
+COPY ${SVC_DIR}/go.mod ${SVC_DIR}/go.sum ${SVC_DIR}/
+WORKDIR /workspace/${SVC_DIR}
+RUN go mod download
+
+# Copy the rest of the service source and build.
+WORKDIR /workspace
+COPY ${SVC_DIR}/ ${SVC_DIR}/
+
+WORKDIR /workspace/${SVC_DIR}
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o /server ./cmd/server
+
+# ---- Runtime Stage (alpine for local dev — wget needed for healthchecks) ----
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates wget
+
+COPY --from=builder /server /server
+
+ARG SVC_DIR
+COPY --from=builder /workspace/${SVC_DIR}/migrations /migrations
+
+ENV PORT=8080
+EXPOSE 8080
+
+ENTRYPOINT ["/server"]
