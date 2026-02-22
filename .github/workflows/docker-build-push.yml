@@ -27,6 +27,7 @@ jobs:
           sparse-checkout: Dockerfile.svc
           sparse-checkout-cone-mode: false
           path: ./
+          token: ${{ secrets.GH_PAT || github.token }}
 
       - name: Checkout service repository
         uses: actions/checkout@v4
